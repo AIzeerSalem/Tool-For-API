@@ -139,8 +139,10 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const replayRequest = async (request: ApiRequest) => {
-    const profile = profiles.find(p => p.id === request.profileId);
-    if (!profile) {
+    // Since profileId is not part of ApiRequest, we'll need to handle this differently
+    // We can get the profile from the request URL matching against our profiles
+    const matchingProfile = profiles.find(p => request.url.startsWith(p.baseUrl));
+    if (!matchingProfile) {
       throw new ApiError('Profile not found', 'PROFILE_NOT_FOUND');
     }
 
@@ -163,7 +165,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               ...request.headers,
               'Content-Type': 'application/json',
             },
-            body: request.body ? JSON.stringify(request.body) : undefined,
+            body: request.data ? JSON.stringify(request.data) : undefined,
             signal: controller.signal,
           });
 

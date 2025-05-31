@@ -1,141 +1,133 @@
-import localforage from 'localforage';
-import { ApiProfile, RequestHistory } from '../types';
+import { ApiProfile } from '../types';
 
-// Initialize localforage
-localforage.config({
-  name: 'api-tool',
-  storeName: 'api_tool_store',
-});
+// Simple encryption key (in production, this should be properly managed)
+const ENCRYPTION_KEY = 'your-secret-key';
 
-export const storage = {
-  async getItem<T>(key: string): Promise<T | null> {
+// Helper functions for encryption
+const encrypt = (text: string): string => {
+  const textToChars = (text: string): number[] => text.split('').map(c => c.charCodeAt(0));
+  const byteHex = (n: number): string => ("0" + Number(n).toString(16)).substr(-2);
+  const applySaltToChar = (code: number[]): number => {
+    return textToChars(ENCRYPTION_KEY).reduce((a, b) => a ^ b, code[0]);
+  };
+
+  return text
+    .split('')
+    .map(c => [c.charCodeAt(0)])
+    .map(applySaltToChar)
+    .map(byteHex)
+    .join('');
+};
+
+const decrypt = (encoded: string): string => {
+  const textToChars = (text: string): number[] => text.split('').map(c => c.charCodeAt(0));
+  const applySaltToChar = (code: number): number => {
+    return textToChars(ENCRYPTION_KEY).reduce((a, b) => a ^ b, code);
+  };
+  
+  return encoded
+    .match(/.{1,2}/g)!
+    .map(hex => parseInt(hex, 16))
+    .map(applySaltToChar)
+    .map(charCode => String.fromCharCode(charCode))
+    .join('');
+};
+
+// Helper to determine if a value needs encryption
+const needsEncryption = (key: string, value: unknown): boolean => {
+  if (key === 'profiles') {
+    return false; // We'll handle profile encryption separately
+  }
+  return key.includes('auth') || key.includes('key') || key.includes('token');
+};
+
+// Helper to encrypt/decrypt profiles
+const processProfiles = (profiles: ApiProfile[], shouldEncrypt: boolean): ApiProfile[] => {
+  return profiles.map(profile => ({
+    ...profile,
+    authValue: profile.authValue 
+      ? shouldEncrypt 
+        ? window.btoa(profile.authValue)
+        : window.atob(profile.authValue)
+      : undefined,
+    apiKey: profile.apiKey
+      ? shouldEncrypt
+        ? window.btoa(profile.apiKey)
+        : window.atob(profile.apiKey)
+      : undefined,
+  }));
+};
+
+interface StorageService {
+  getItem: <T>(key: string) => Promise<T | null>;
+  setItem: <T>(key: string, value: T) => Promise<void>;
+  removeItem: (key: string) => Promise<void>;
+  clear: () => Promise<void>;
+}
+
+export const storage: StorageService = {
+  getItem: async <T>(key: string): Promise<T | null> => {
     try {
-      return await localforage.getItem<T>(key);
+      const item = localStorage.getItem(key);
+      if (!item) return null;
+
+      let value: T;
+      
+      if (key === 'profiles') {
+        // Handle profiles specially
+        const profiles = JSON.parse(item);
+        value = processProfiles(profiles, false) as T;
+      } else {
+        // Handle other data
+        const decrypted = needsEncryption(key, item) ? decrypt(item) : item;
+        value = JSON.parse(decrypted);
+      }
+
+      return value;
     } catch (error) {
-      console.error(`Error getting item ${key}:`, error);
+      console.error('Error reading from storage:', error);
       return null;
     }
   },
 
-  async setItem<T>(key: string, value: T): Promise<void> {
+  setItem: async <T>(key: string, value: T): Promise<void> => {
     try {
-      await localforage.setItem(key, value);
+      let storageValue: string;
+      
+      if (key === 'profiles') {
+        // Handle profiles specially
+        const profiles = processProfiles(value as ApiProfile[], true);
+        storageValue = JSON.stringify(profiles);
+      } else {
+        // Handle other data
+        storageValue = JSON.stringify(value);
+        if (needsEncryption(key, value)) {
+          storageValue = encrypt(storageValue);
+        }
+      }
+
+      localStorage.setItem(key, storageValue);
     } catch (error) {
-      console.error(`Error setting item ${key}:`, error);
+      console.error('Error writing to storage:', error);
+      throw error;
     }
   },
 
-  async removeItem(key: string): Promise<void> {
+  removeItem: async (key: string): Promise<void> => {
     try {
-      await localforage.removeItem(key);
+      localStorage.removeItem(key);
     } catch (error) {
-      console.error(`Error removing item ${key}:`, error);
+      console.error('Error removing from storage:', error);
+      throw error;
     }
   },
 
-  async clear(): Promise<void> {
+  clear: async (): Promise<void> => {
     try {
-      await localforage.clear();
+      localStorage.clear();
     } catch (error) {
       console.error('Error clearing storage:', error);
+      throw error;
     }
   },
-
-  async exportData(): Promise<Record<string, any>> {
-    const data: Record<string, any> = {};
-    try {
-      await localforage.iterate((value, key) => {
-        data[key] = value;
-      });
-    } catch (error) {
-      console.error('Error exporting data:', error);
-    }
-    return data;
-  },
-
-  async importData(data: Record<string, any>): Promise<void> {
-    try {
-      await this.clear();
-      for (const [key, value] of Object.entries(data)) {
-        await this.setItem(key, value);
-      }
-    } catch (error) {
-      console.error('Error importing data:', error);
-    }
-  },
-};
-
-class StorageService {
-  private store = localforage;
-
-  async getItem<T>(key: string): Promise<T | null> {
-    return this.store.getItem<T>(key);
-  }
-
-  async setItem<T>(key: string, value: T): Promise<T> {
-    return this.store.setItem<T>(key, value);
-  }
-
-  async removeItem(key: string): Promise<void> {
-    return this.store.removeItem(key);
-  }
-
-  async clear(): Promise<void> {
-    return this.store.clear();
-  }
-
-  async exportData(): Promise<{
-    profiles: ApiProfile[];
-    history: RequestHistory[];
-    settings: {
-      darkMode: boolean;
-      mockEnabled: boolean;
-    };
-  }> {
-    const [profiles, history, darkMode, mockEnabled] = await Promise.all([
-      this.getItem<ApiProfile[]>('profiles'),
-      this.getItem<RequestHistory[]>('history'),
-      this.getItem<boolean>('darkMode'),
-      this.getItem<boolean>('mockEnabled'),
-    ]);
-
-    return {
-      profiles: profiles || [],
-      history: history || [],
-      settings: {
-        darkMode: darkMode || false,
-        mockEnabled: mockEnabled || false,
-      },
-    };
-  }
-
-  async importData(data: {
-    profiles?: ApiProfile[];
-    history?: RequestHistory[];
-    settings?: {
-      darkMode?: boolean;
-      mockEnabled?: boolean;
-    };
-  }): Promise<void> {
-    const operations = [];
-
-    if (data.profiles) {
-      operations.push(this.setItem('profiles', data.profiles));
-    }
-    if (data.history) {
-      operations.push(this.setItem('history', data.history));
-    }
-    if (data.settings) {
-      if (typeof data.settings.darkMode === 'boolean') {
-        operations.push(this.setItem('darkMode', data.settings.darkMode));
-      }
-      if (typeof data.settings.mockEnabled === 'boolean') {
-        operations.push(this.setItem('mockEnabled', data.settings.mockEnabled));
-      }
-    }
-
-    await Promise.all(operations);
-  }
-}
-
-export const storageService = new StorageService(); 
+}; 

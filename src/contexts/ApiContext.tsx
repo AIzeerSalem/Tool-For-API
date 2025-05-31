@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { storage } from '../services/storage';
 import { mockApi } from '../services/mockApi';
-import { ApiProfile, ApiRequest, ApiResponse, ApiContextValue } from '../types';
+import { ApiProfile, ApiRequest, ApiResponse, ApiContextValue, ApiError } from '../types';
+
+const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
 const ApiContext = createContext<ApiContextValue | null>(null);
 
@@ -16,6 +18,7 @@ export const useApi = () => {
 export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [profiles, setProfiles] = useState<ApiProfile[]>([]);
   const [history, setHistory] = useState<Array<{ request: ApiRequest; response: ApiResponse }>>([]);
+  const [activeRequests, setActiveRequests] = useState<Map<string, AbortController>>(new Map());
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem('darkMode');
     return saved ? JSON.parse(saved) : false;
@@ -27,12 +30,17 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     const loadData = async () => {
-      const [savedProfiles, savedHistory] = await Promise.all([
-        storage.getItem('profiles'),
-        storage.getItem('history'),
-      ]);
-      if (savedProfiles) setProfiles(savedProfiles);
-      if (savedHistory) setHistory(savedHistory);
+      try {
+        const [savedProfiles, savedHistory] = await Promise.all([
+          storage.getItem<ApiProfile[]>('profiles'),
+          storage.getItem<Array<{ request: ApiRequest; response: ApiResponse }>>('history'),
+        ]);
+        if (savedProfiles) setProfiles(savedProfiles as ApiProfile[]);
+        if (savedHistory) setHistory(savedHistory as Array<{ request: ApiRequest; response: ApiResponse }>);
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        throw new ApiError('Failed to load saved data', 'STORAGE_ERROR');
+      }
     };
     loadData();
   }, []);
@@ -45,72 +53,173 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mockEnabled', JSON.stringify(isMockEnabled));
   }, [isMockEnabled]);
 
+  // Cleanup function for active requests
+  useEffect(() => {
+    return () => {
+      activeRequests.forEach(controller => controller.abort());
+    };
+  }, [activeRequests]);
+
   const addProfile = async (profile: ApiProfile) => {
-    const updatedProfiles = [...profiles, profile];
-    await storage.setItem('profiles', updatedProfiles);
-    setProfiles(updatedProfiles);
+    try {
+      const updatedProfiles = [...profiles, profile];
+      await storage.setItem('profiles', updatedProfiles);
+      setProfiles(updatedProfiles);
+    } catch (error) {
+      console.error('Failed to add profile:', error);
+      throw new ApiError('Failed to add profile', 'STORAGE_ERROR');
+    }
   };
 
   const updateProfile = async (profile: ApiProfile) => {
-    const updatedProfiles = profiles.map(p => 
-      p.id === profile.id ? profile : p
-    );
-    await storage.setItem('profiles', updatedProfiles);
-    setProfiles(updatedProfiles);
+    try {
+      const updatedProfiles = profiles.map(p => 
+        p.id === profile.id ? profile : p
+      );
+      await storage.setItem('profiles', updatedProfiles);
+      setProfiles(updatedProfiles);
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      throw new ApiError('Failed to update profile', 'STORAGE_ERROR');
+    }
   };
 
   const deleteProfile = async (id: string) => {
-    const updatedProfiles = profiles.filter(p => p.id !== id);
-    await storage.setItem('profiles', updatedProfiles);
-    setProfiles(updatedProfiles);
+    try {
+      const updatedProfiles = profiles.filter(p => p.id !== id);
+      await storage.setItem('profiles', updatedProfiles);
+      setProfiles(updatedProfiles);
+    } catch (error) {
+      console.error('Failed to delete profile:', error);
+      throw new ApiError('Failed to delete profile', 'STORAGE_ERROR');
+    }
   };
 
   const addHistoryItem = async (request: ApiRequest, response: ApiResponse) => {
-    const updatedHistory = [...history, { request, response }];
-    await storage.setItem('history', updatedHistory);
-    setHistory(updatedHistory);
+    try {
+      const updatedHistory = [...history, { request, response }];
+      // Keep only the last 100 requests to prevent performance issues
+      const trimmedHistory = updatedHistory.slice(-100);
+      await storage.setItem('history', trimmedHistory);
+      setHistory(trimmedHistory);
+    } catch (error) {
+      console.error('Failed to add history item:', error);
+      throw new ApiError('Failed to add history item', 'STORAGE_ERROR');
+    }
   };
 
   const clearHistory = async () => {
-    await storage.setItem('history', []);
-    setHistory([]);
+    try {
+      await storage.setItem('history', []);
+      setHistory([]);
+    } catch (error) {
+      console.error('Failed to clear history:', error);
+      throw new ApiError('Failed to clear history', 'STORAGE_ERROR');
+    }
   };
 
   const deleteHistoryItem = async (requestId: string) => {
-    const updatedHistory = history.filter(item => item.request.id !== requestId);
-    await storage.setItem('history', updatedHistory);
-    setHistory(updatedHistory);
+    try {
+      const updatedHistory = history.filter(item => item.request.id !== requestId);
+      await storage.setItem('history', updatedHistory);
+      setHistory(updatedHistory);
+    } catch (error) {
+      console.error('Failed to delete history item:', error);
+      throw new ApiError('Failed to delete history item', 'STORAGE_ERROR');
+    }
+  };
+
+  const cancelRequest = (requestId: string) => {
+    const controller = activeRequests.get(requestId);
+    if (controller) {
+      controller.abort();
+      activeRequests.delete(requestId);
+      setActiveRequests(new Map(activeRequests));
+    }
   };
 
   const replayRequest = async (request: ApiRequest) => {
     const profile = profiles.find(p => p.id === request.profileId);
     if (!profile) {
-      throw new Error('Profile not found');
+      throw new ApiError('Profile not found', 'PROFILE_NOT_FOUND');
     }
 
-    const response = isMockEnabled
-      ? await mockApi.request(request)
-      : await fetch(request.url, {
-          method: request.method,
-          headers: {
-            ...request.headers,
-            'Content-Type': 'application/json',
-          },
-          body: request.body ? JSON.stringify(request.body) : undefined,
-        }).then(async res => ({
-          status: res.status,
-          statusText: res.statusText,
-          headers: Object.fromEntries(res.headers.entries()),
-          data: await res.json(),
-          timestamp: Date.now(),
-        }));
+    // Create abort controller for this request
+    const controller = new AbortController();
+    setActiveRequests(prev => new Map(prev).set(request.id, controller));
 
-    await addHistoryItem(request, response);
-    return response;
+    try {
+      let response: ApiResponse;
+
+      if (isMockEnabled) {
+        response = await mockApi.request(request);
+      } else {
+        const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
+
+        try {
+          const res = await fetch(request.url, {
+            method: request.method,
+            headers: {
+              ...request.headers,
+              'Content-Type': 'application/json',
+            },
+            body: request.body ? JSON.stringify(request.body) : undefined,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          let responseData;
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            try {
+              responseData = await res.json();
+            } catch (error) {
+              responseData = { error: 'Invalid JSON response' };
+            }
+          } else {
+            responseData = await res.text();
+          }
+
+          response = {
+            status: res.status,
+            statusText: res.statusText,
+            headers: Object.fromEntries(res.headers.entries()),
+            data: responseData,
+            timestamp: Date.now(),
+          };
+        } catch (error) {
+          if (error instanceof Error) {
+            if (error.name === 'AbortError') {
+              throw new ApiError('Request timeout or cancelled', 'REQUEST_ABORTED');
+            }
+            throw error;
+          }
+          throw new ApiError('Unknown error occurred', 'NETWORK_ERROR');
+        }
+      }
+
+      await addHistoryItem(request, response);
+      return response;
+    } catch (error) {
+      console.error('Request failed:', error);
+      const errorResponse: ApiResponse = {
+        status: error instanceof Error ? 0 : (error as any).status || 0,
+        statusText: error instanceof Error ? error.message : 'Request failed',
+        headers: {},
+        data: { error: error instanceof Error ? error.message : 'Unknown error' },
+        timestamp: Date.now(),
+      };
+      await addHistoryItem(request, errorResponse);
+      throw error;
+    } finally {
+      activeRequests.delete(request.id);
+      setActiveRequests(new Map(activeRequests));
+    }
   };
 
-  const toggleDarkMode = () => setIsDarkMode(prev => !prev);
-  const toggleMockApi = () => setIsMockEnabled(prev => !prev);
+  const toggleDarkMode = () => setIsDarkMode((prev: boolean) => !prev);
+  const toggleMockApi = () => setIsMockEnabled((prev: boolean) => !prev);
 
   const value: ApiContextValue = {
     profiles,
@@ -125,6 +234,7 @@ export const ApiProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toggleDarkMode,
     isMockEnabled,
     toggleMockApi,
+    cancelRequest,
   };
 
   return (

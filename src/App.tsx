@@ -1,46 +1,39 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { CssBaseline, Box } from '@mui/material';
-import { ApiProvider } from './contexts/ApiContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import Header from './components/layout/Header';
-import Sidebar from './components/layout/Sidebar';
-import Dashboard from './components/pages/Dashboard';
-import ApiProfiles from './components/pages/ApiProfiles';
-import RequestHistory from './components/pages/RequestHistory';
-import Settings from './components/pages/Settings';
+import React, { useState } from 'react';
+import { Container, Box } from '@mui/material';
+import ProfileSelector from './components/ProfileSelector';
+import RequestForm from './components/RequestForm';
+import ResponseViewer from './components/ResponseViewer';
+import { ApiProfile, ApiResponse } from './types/api';
 
-const App: React.FC = () => {
+function App() {
+  const [selectedProfile, setSelectedProfile] = useState<ApiProfile | null>(null);
+  const [profiles, setProfiles] = useState<ApiProfile[]>([]);
+  const [lastResponse, setLastResponse] = useState<ApiResponse | null>(null);
+
+  const handleProfileAdd = (profile: ApiProfile) => {
+    setProfiles([...profiles, profile]);
+  };
+
+  const handleProfileSelect = (profile: ApiProfile) => {
+    setSelectedProfile(profile);
+  };
+
   return (
-    <ApiProvider>
-      <ThemeProvider>
-        <CssBaseline />
-        <Router>
-          <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-            <Header />
-            <Sidebar />
-            <Box
-              component="main"
-              sx={{
-                flexGrow: 1,
-                p: 3,
-                mt: 8,
-                ml: { sm: 30 },
-                backgroundColor: 'background.default'
-              }}
-            >
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/profiles" element={<ApiProfiles />} />
-                <Route path="/history" element={<RequestHistory />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Box>
-          </Box>
-        </Router>
-      </ThemeProvider>
-    </ApiProvider>
+    <div className="App">
+      <Container maxWidth="lg">
+        <Box sx={{ py: 4 }}>
+          <ProfileSelector
+            profiles={profiles}
+            selectedProfile={selectedProfile}
+            onProfileSelect={handleProfileSelect}
+            onProfileAdd={handleProfileAdd}
+          />
+          <RequestForm onResponse={setLastResponse} />
+          {lastResponse && <ResponseViewer response={lastResponse} />}
+        </Box>
+      </Container>
+    </div>
   );
-};
+}
 
 export default App;

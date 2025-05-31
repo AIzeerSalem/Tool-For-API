@@ -10,11 +10,11 @@ export interface ApiProfile {
 
 export interface ApiRequest {
   id: string;
-  profileId: string;
-  url: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  headers: Record<string, string>;
-  body?: unknown;
+  url: string;
+  headers?: Record<string, string>;
+  params?: Record<string, any>;
+  data?: any;
   timestamp: number;
 }
 
@@ -86,4 +86,11 @@ export interface ApiEndpoint {
   method: string;
   description: string;
   parameters: ApiParameter[];
+}
+
+export interface ApiConfig {
+  timeout?: number;
+  retryAttempts?: number;
+  retryDelay?: number;
+  validateStatus?: (status: number) => boolean;
 } 

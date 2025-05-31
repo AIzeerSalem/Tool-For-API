@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -11,27 +11,22 @@ import {
   ListItemSecondaryAction,
   Button,
   Stack,
+  Paper,
 } from '@mui/material';
 import { useApi } from '../../contexts/ApiContext';
 import { storage } from '../../services/storage';
+import { dataTransfer } from '../../services/dataTransfer';
 
 const Settings: React.FC = () => {
   const { isDarkMode, toggleDarkMode, isMockEnabled, toggleMockApi } = useApi();
+  const [error, setError] = useState<string | null>(null);
 
   const handleExportData = async () => {
     try {
-      const data = await storage.exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `api-tool-backup-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      await dataTransfer.downloadExport();
     } catch (error) {
       console.error('Failed to export data:', error);
+      setError('Failed to export data');
     }
   };
 
@@ -40,12 +35,11 @@ const Settings: React.FC = () => {
     if (!file) return;
 
     try {
-      const content = await file.text();
-      const data = JSON.parse(content);
-      await storage.importData(data);
+      await dataTransfer.uploadImport(file);
       window.location.reload(); // Refresh to load imported data
     } catch (error) {
       console.error('Failed to import data:', error);
+      setError('Failed to import data');
     }
   };
 
@@ -97,26 +91,30 @@ const Settings: React.FC = () => {
             <Typography variant="h6" gutterBottom>
               Data Management
             </Typography>
-            <Stack spacing={2} direction="row">
-              <Button
-                variant="outlined"
-                onClick={handleExportData}
-              >
-                Export Data
-              </Button>
-              <Button
-                variant="outlined"
-                component="label"
-              >
-                Import Data
-                <input
-                  type="file"
-                  accept=".json"
-                  hidden
-                  onChange={handleImportData}
-                />
-              </Button>
-            </Stack>
+            <Paper sx={{ p: 3, mb: 3 }}>
+              <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Button variant="contained" onClick={handleExportData}>
+                  Export Data
+                </Button>
+                <Button
+                  variant="contained"
+                  component="label"
+                >
+                  Import Data
+                  <input
+                    type="file"
+                    hidden
+                    accept=".json"
+                    onChange={handleImportData}
+                  />
+                </Button>
+              </Box>
+              {error && (
+                <Typography color="error" sx={{ mt: 2 }}>
+                  {error}
+                </Typography>
+              )}
+            </Paper>
           </CardContent>
         </Card>
       </Stack>

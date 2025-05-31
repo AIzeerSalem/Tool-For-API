@@ -24,7 +24,7 @@ A modern React-based API interaction tool that allows you to test, monitor, and 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/api-tool.git
+git clone https://github.com/AIzeerSalem/Tool-For-API.git
 cd api-tool
 ```
 
@@ -75,58 +75,3 @@ The application will be available at `http://localhost:3000`.
 - Toggle dark/light theme
 - Enable/disable mock API
 - Import/export application data
-
-## Technology Stack
-
-- React 18
-- TypeScript
-- Material-UI v5
-- React Router v6
-- Chart.js
-- LocalForage
-- React ChartJS 2
-
-## Project Structure
-
-```
-api-tool/
-├── src/
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Header.tsx
-│   │   │   └── Sidebar.tsx
-│   │   └── pages/
-│   │       ├── Dashboard.tsx
-│   │       ├── ApiProfiles.tsx
-│   │       ├── RequestHistory.tsx
-│   │       └── Settings.tsx
-│   ├── contexts/
-│   │   ├── ApiContext.tsx
-│   │   └── ThemeContext.tsx
-│   ├── services/
-│   │   ├── storage.ts
-│   │   └── mockApi.ts
-│   ├── types/
-│   │   └── index.ts
-│   └── App.tsx
-└── package.json
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Material-UI for the beautiful component library
-- Chart.js for data visualization
-- LocalForage for persistent storage
-- React community for the amazing ecosystem

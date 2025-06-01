@@ -5,17 +5,17 @@ export interface ApiProfile {
   authType: 'none' | 'bearer' | 'basic';
   authValue?: string;
   apiKey?: string;
-  headers?: Record<string, string>;
+  headers: Record<string, string>;
 }
 
 export interface ApiRequest {
   id: string;
-  method: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
   headers?: Record<string, string>;
-  body?: any;
+  data?: any;
+  params?: Record<string, string>;
   timestamp: number;
-  profileId?: string;
 }
 
 export interface ApiResponse {
@@ -24,6 +24,20 @@ export interface ApiResponse {
   headers: Record<string, string>;
   data: any;
   timestamp: number;
+}
+
+export interface ApiConfig {
+  timeout?: number;
+  retryAttempts?: number;
+  retryDelay?: number;
+  validateStatus?: (status: number) => boolean;
+}
+
+export interface ApiError {
+  message: string;
+  status?: number;
+  data?: any;
+  config?: any;
 }
 
 export interface ApiContextValue {

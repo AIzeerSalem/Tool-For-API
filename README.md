@@ -1,31 +1,31 @@
-# API Tool
+# API Testing Tool
 
-A modern React-based API interaction tool that allows you to test, monitor, and manage API requests with a beautiful and intuitive interface.
+A comprehensive React-based API testing tool with support for multiple profiles, request history, and mock responses.
 
 ## Features
 
-- 🚀 Modern React + TypeScript implementation
-- 🎨 Material-UI with dark mode support
-- 📝 API profile management
-- 📊 Real-time request visualization
-- 🔄 Request history with replay functionality
-- 🧪 Mock API support for offline testing
-- 💾 Local data persistence
-- 📤 Data import/export functionality
+- Multiple API profile management
+- Request history tracking
+- Response caching with TTL
+- Mock API support
+- Dark mode support
+- Comprehensive error handling
+- TypeScript support
+- Full test coverage
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm or yarn
+- Node.js (v14 or later)
+- npm (v6 or later)
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/api-tool.git
-cd api-tool
+git clone https://github.com/yourusername/Tool-For-API.git
+cd Tool-For-API
 ```
 
 2. Install dependencies:
@@ -38,79 +38,56 @@ npm install
 npm start
 ```
 
-The application will be available at `http://localhost:3000`.
+### Running Tests
 
-## Usage
+The project uses Jest and React Testing Library for testing. To run tests:
 
-### API Profiles
+```bash
+# Run all tests
+npm test
 
-- Create and manage multiple API profiles
-- Configure authentication (Bearer Token, Basic Auth)
-- Set custom headers and API keys
-- Enable/disable mock API responses
+# Run tests with coverage
+npm test -- --coverage
 
-### Making Requests
-
-1. Select an API profile from the header dropdown
-2. Choose the request method (GET, POST, PUT, DELETE, PATCH)
-3. Enter the endpoint path
-4. Add request body for POST/PUT/PATCH requests
-5. Click "Send Request" to execute
-
-### Request History
-
-- View all previous requests with timestamps
-- See request details including parameters and responses
-- Replay previous requests with a single click
-- Clear history as needed
-
-### Data Visualization
-
-- Monitor response times with real-time charts
-- Analyze status code distribution
-- Track API usage patterns
-
-### Settings
-
-- Toggle dark/light theme
-- Enable/disable mock API
-- Import/export application data
-
-## Technology Stack
-
-- React 18
-- TypeScript
-- Material-UI v5
-- React Router v6
-- Chart.js
-- LocalForage
-- React ChartJS 2
+# Run tests in watch mode
+npm test -- --watch
+```
 
 ## Project Structure
 
 ```
-api-tool/
-├── src/
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Header.tsx
-│   │   │   └── Sidebar.tsx
-│   │   └── pages/
-│   │       ├── Dashboard.tsx
-│   │       ├── ApiProfiles.tsx
-│   │       ├── RequestHistory.tsx
-│   │       └── Settings.tsx
-│   ├── contexts/
-│   │   ├── ApiContext.tsx
-│   │   └── ThemeContext.tsx
-│   ├── services/
-│   │   ├── storage.ts
-│   │   └── mockApi.ts
-│   ├── types/
-│   │   └── index.ts
-│   └── App.tsx
-└── package.json
+src/
+├── components/      # React components
+├── contexts/        # React contexts
+├── services/        # Core services
+├── types/          # TypeScript types
+├── utils/          # Utility functions
+└── __tests__/      # Test files
 ```
+
+## Testing Strategy
+
+The project follows a comprehensive testing strategy:
+
+1. Unit Tests
+   - Core services (apiClient, cacheService, etc.)
+   - Utility functions
+   - React hooks
+
+2. Integration Tests
+   - API Context
+   - Component interactions
+   - Service interactions
+
+3. Component Tests
+   - UI components
+   - User interactions
+   - State management
+
+4. Mock Services
+   - API responses
+   - Storage operations
+   - Network requests
 
 ## Contributing
 
@@ -122,11 +99,4 @@ api-tool/
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Material-UI for the beautiful component library
-- Chart.js for data visualization
-- LocalForage for persistent storage
-- React community for the amazing ecosystem
+This project is licensed under the MIT License - see the LICENSE file for details
